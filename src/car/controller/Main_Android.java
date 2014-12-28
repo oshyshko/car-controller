@@ -10,6 +10,17 @@ public class Main_Android extends Activity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    Main.main(null);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+
         setContentView(R.layout.main);
     }
 }
