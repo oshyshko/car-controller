@@ -2,29 +2,30 @@ package shared;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.*;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static shared.IO.println;
 
 public abstract class Udp implements Closeable {
     public static boolean DEBUG;
 
-    private DatagramSocket socket;
-    private AtomicBoolean running;
+    protected DatagramSocket socket;
+    protected volatile boolean running;
 
     public Udp(int port) throws IOException {
         if (DEBUG)  println("Listening UDP packets on port " + port);
 
         socket = new DatagramSocket(port);
-        running = new AtomicBoolean(true);
+        running = true;
 
         final Thread t = new Thread(
                 new Runnable() {
                     public void run() {
                         byte[] buffer = new byte[1024];
-                        while (running.get()) {
+                        while (running) {
                             try {
                                 DatagramPacket p = new DatagramPacket(buffer, buffer.length);
                                 socket.receive(p);
@@ -50,15 +51,19 @@ public abstract class Udp implements Closeable {
     protected abstract void onReceive(InetSocketAddress from, byte[] bytes);
 
     public void close() throws IOException {
-        running.set(false);
+        running = false;
         socket.close();
     }
 
     public void send(InetSocketAddress to, byte[] bytes) {
+        send(to, bytes, false);
+    }
+
+    public void send(InetSocketAddress to, byte[] bytes, boolean broadcast) {
         if (DEBUG) println("> " + to + " => " + Udp.toString(bytes));
         try {
             socket.send(new DatagramPacket(bytes, bytes.length, to));
-        } catch (IOException e) {
+        } catch (Throwable e) {
             Errors.die(e);
         }
     }
@@ -68,5 +73,9 @@ public abstract class Udp implements Closeable {
         for (byte b : bytes)
             bs.add(b);
         return bs.toString();
+    }
+
+    public boolean isRunning() {
+        return running;
     }
 }
