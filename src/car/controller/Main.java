@@ -7,14 +7,14 @@ import java.net.InetSocketAddress;
 
 public class Main {
     public static void main(String[] args) throws Exception {
-        Udp.DEBUG = false;
+        Udp.DEBUG = true;
 
-        Network.Controller.start();
+        Network network = new Network();
 
         byte id = 0;
         while (true) {
-            Network.Controller.update(
-                    new InetSocketAddress(Network.CAR_IP, Network.CAR_PORT),
+            network.controller_update(
+                    new InetSocketAddress(Network.CAR_IP, Network.PORT),
                     id++, (byte) (id + 10), (byte) (id + 20));
 
             // TODO adjust sleep (period - delta-from-previous-call)

@@ -8,25 +8,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static shared.IO.println;
 
-public class Udp {
-    public static boolean DEBUG = false;
+public abstract class Udp implements Closeable {
+    public static boolean DEBUG;
 
-    public static void send(InetSocketAddress to, byte[] bytes) {
-        if (DEBUG) println("> " + to + " => " + toString(bytes));
-        try {
-            try (DatagramSocket socket = new DatagramSocket()) {
-                socket.send(new DatagramPacket(bytes, bytes.length, to));
-                socket.close();
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
+    private DatagramSocket socket;
+    private AtomicBoolean running;
 
-    public static Server listen(int port, final OnReceive onReceive) throws IOException {
+    public Udp(int port) throws IOException {
         if (DEBUG)  println("Listening UDP packets on port " + port);
-        final DatagramSocket ss = new DatagramSocket(port);
-        final AtomicBoolean running = new AtomicBoolean(true);
+
+        socket = new DatagramSocket(port);
+        running = new AtomicBoolean(true);
 
         final Thread t = new Thread(
                 new Runnable() {
@@ -35,7 +27,7 @@ public class Udp {
                         while (running.get()) {
                             try {
                                 DatagramPacket p = new DatagramPacket(buffer, buffer.length);
-                                ss.receive(p);
+                                socket.receive(p);
 
                                 InetSocketAddress from = (InetSocketAddress) p.getSocketAddress();
 
@@ -44,22 +36,31 @@ public class Udp {
 
                                 if (DEBUG) println("< " + from + " <=" + Udp.toString(bytes));
 
-                                onReceive.onReceive(from, bytes);
+                                onReceive((InetSocketAddress) p.getSocketAddress(), bytes);
                             } catch (IOException e) {
-                                if (!ss.isClosed())
+                                if (!socket.isClosed())
                                     Errors.die(e);
                             }
                         }
                     }
                 });
         t.start();
+    }
 
-        return new Server() {
-            public void close() throws IOException {
-                running.set(false);
-                ss.close();
-            }
-        };
+    protected abstract void onReceive(InetSocketAddress from, byte[] bytes);
+
+    public void close() throws IOException {
+        running.set(false);
+        socket.close();
+    }
+
+    public void send(InetSocketAddress to, byte[] bytes) {
+        if (DEBUG) println("> " + to + " => " + Udp.toString(bytes));
+        try {
+            socket.send(new DatagramPacket(bytes, bytes.length, to));
+        } catch (IOException e) {
+            Errors.die(e);
+        }
     }
 
     public static String toString(byte[] bytes) {
@@ -68,8 +69,4 @@ public class Udp {
             bs.add(b);
         return bs.toString();
     }
-
-
-    public static interface Server extends Closeable {}
-    public static interface OnReceive { void onReceive(InetSocketAddress from, byte[] bytes); }
 }
