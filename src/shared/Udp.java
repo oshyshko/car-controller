@@ -2,10 +2,8 @@ package shared;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetSocketAddress;
-import java.util.ArrayList;
+import java.net.*;
+import java.util.*;
 
 import static shared.IO.println;
 
@@ -16,10 +14,11 @@ public abstract class Udp implements Closeable {
     protected volatile boolean running;
 
     public Udp(int port) throws IOException {
-        if (DEBUG)  println("Listening UDP packets on port " + port);
-
         socket = new DatagramSocket(port);
+        socket.setBroadcast(true);
         running = true;
+
+        if (DEBUG)  println("Listening for UDP packets on " + socket.getLocalSocketAddress());
 
         final Thread t = new Thread(
                 new Runnable() {
@@ -77,5 +76,20 @@ public abstract class Udp implements Closeable {
 
     public boolean isRunning() {
         return running;
+    }
+
+    // util
+    public static Map<InetAddress, InetAddress> address2broadcast() {
+        try {
+            Map<InetAddress, InetAddress> address2broadcast = new HashMap<>();
+            for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces()))
+                if (ni != null && !ni.isLoopback() && ni.isUp())
+                    for (InterfaceAddress address : ni.getInterfaceAddresses())
+                        if (address != null && address.getBroadcast() != null)
+                            address2broadcast.put(address.getAddress(), address.getBroadcast());
+            return address2broadcast;
+        } catch (SocketException e) {
+            return Collections.EMPTY_MAP;
+        }
     }
 }
