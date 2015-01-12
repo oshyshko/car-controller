@@ -20,31 +20,29 @@ public abstract class Udp implements Closeable {
 
         if (DEBUG)  println("Listening for UDP packets on " + socket.getLocalSocketAddress());
 
-        final Thread t = new Thread(
-                new Runnable() {
-                    public void run() {
-                        byte[] buffer = new byte[1024];
-                        while (running) {
-                            try {
-                                DatagramPacket p = new DatagramPacket(buffer, buffer.length);
-                                socket.receive(p);
+        Threads.fork(new Runnable() {
+            public void run() {
+                byte[] buffer = new byte[1024];
+                while (running) {
+                    try {
+                        DatagramPacket p = new DatagramPacket(buffer, buffer.length);
+                        socket.receive(p);
 
-                                InetSocketAddress from = (InetSocketAddress) p.getSocketAddress();
+                        InetSocketAddress from = (InetSocketAddress) p.getSocketAddress();
 
-                                byte[] bytes = new byte[p.getLength()];
-                                System.arraycopy(p.getData(), p.getOffset(), bytes, 0, p.getLength());
+                        byte[] bytes = new byte[p.getLength()];
+                        System.arraycopy(p.getData(), p.getOffset(), bytes, 0, p.getLength());
 
-                                if (DEBUG) println("< " + from + " <=" + Udp.toString(bytes));
+                        if (DEBUG) println("< " + from + " <=" + Udp.toString(bytes));
 
-                                onReceive((InetSocketAddress) p.getSocketAddress(), bytes);
-                            } catch (IOException e) {
-                                if (!socket.isClosed())
-                                    Errors.die(e);
-                            }
-                        }
+                        onReceive((InetSocketAddress) p.getSocketAddress(), bytes);
+                    } catch (IOException e) {
+                        if (!socket.isClosed())
+                            Errors.die(e);
                     }
-                });
-        t.start();
+                }
+            }
+        });
     }
 
     protected abstract void onReceive(InetSocketAddress from, byte[] bytes);
@@ -55,10 +53,6 @@ public abstract class Udp implements Closeable {
     }
 
     public void send(InetSocketAddress to, byte[] bytes) {
-        send(to, bytes, false);
-    }
-
-    public void send(InetSocketAddress to, byte[] bytes, boolean broadcast) {
         if (DEBUG) println("> " + to + " => " + Udp.toString(bytes));
         try {
             socket.send(new DatagramPacket(bytes, bytes.length, to));
